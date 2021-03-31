@@ -22,17 +22,18 @@
 namespace script {
 
 template <typename T>
-ScriptClass::ScriptClass(ScriptClass::ConstructFromCpp<T>) : internalState_() {
+ScriptClass::ScriptClass(ScriptClass::ConstructFromCpp<T>, Local<Value> &scripThis)
+    : internalState_() {
   auto jscEngine = jsc_backend::currentEngine();
   auto symbol = jscEngine->constructorMarkSymbol_.get();
-  auto thiz = jsc_backend::JscEngine::make<Local<Value>>(
+  auto thisPtr = jsc_backend::JscEngine::make<Local<Value>>(
       JSObjectMake(jscEngine->context_, jsc_backend::JscEngine::externalClass_, this));
 
-  auto obj = jscEngine->newNativeClass<T>(symbol, thiz);
+  auto obj = jscEngine->newNativeClass<T>(symbol, thisPtr);
+  scripThis = obj;
 
   internalState_.scriptEngine_ = jscEngine;
-  jsc_backend::JscWeakRef(jsc_interop::toJsc(jscEngine->context_, obj))
-      .swap(internalState_.weakRef_);
+  internalState_.weakRef_ = jsc_backend::JscWeakRef(jsc_interop::toJsc(jscEngine->context_, obj));
 }
 
 template <typename T>

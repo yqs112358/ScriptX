@@ -127,8 +127,8 @@ class ScriptClass {
    *
    * class Context : public ScriptObject {
    * public:
-   *     Context(Canvas* canvas) :
-   *        ScriptObject(ConstructFromCpp<Context>()) {
+   *     Context(Local<Value>& scriptThis, Canvas* canvas) :
+   *        ScriptObject(ConstructFromCpp<Context>(), scriptThis) {
    *            // pay attention, in constructor the `this` is partial inited,
    *            // take care of publishing `this` pointer and/or script object.
    *        }
@@ -138,8 +138,9 @@ class ScriptClass {
    *
    * // NOTE: the pointer is managed be script object
    * // so, just return the script object out, it's all done.
-   * auto pointer = new Context(canvas);
-   * engine->set("context", pointer->getScriptObject());
+   * Local<Value> thiz;
+   * auto pointer = new Context(thiz, canvas);
+   * engine->set("context", thiz);
    * // NEVER delete the pointer, ScriptEngine does that on finalization.
    * // AND NEVER keep the pointer from c++, still, it's managed by ScriptEngine,
    * // use a global reference instead.
@@ -153,8 +154,9 @@ class ScriptClass {
    *
    * auto getContext = Function::newFunction([]() {
    *   Canvas* canvas = render->getCanvas();
-   *   auto pointer = new Context(canvas);
-   *   return pointer->getScriptObject();
+   *   Local<Value> thiz;
+   *   new Context(thiz, canvas);
+   *   return thiz;
    * });
    *
    * \endcode
@@ -167,9 +169,13 @@ class ScriptClass {
    * NOTE: this ctor "CAN BE" implemented with no params, but which makes it the "default
    * constructor" however, there is heavy logic inside this ctor, we deliberately add a param --
    * policy.
+   *
+   * @param policy dummy value to mark this constructor, and pass a typename T of the native script
+   * class type
+   * @param scriptThis an out param, gives the corresponding reference of this instance
    */
   template <typename T>
-  explicit ScriptClass(ConstructFromCpp<T> policy);
+  explicit ScriptClass(ConstructFromCpp<T> policy, Local<Value>& scriptThis);
 
   /**
    * get the script instance representing the native instance.

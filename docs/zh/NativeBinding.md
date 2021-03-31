@@ -173,29 +173,28 @@ ScriptX不保证这个实例一定是在 ScriptObject GC的同时销毁（可能
 
 所以当你在C++成持有一个ScriptClass的指针时，会在这个时间间隙里发现 `ScriptClass::getScriptObject` 返回null。
 
-#### `ScriptClass::ScriptClass(ConstructFromCpp<T>)`
-这个是ScriptClass的另一个构造函数，使用场景是某个绑定类构造时需要很多C++依赖，这样再经过一道ScriptX就导致类型转换很多很麻烦。所以提供这个构造函数，直接用C++new一个实例出来，然后通过 `getScriptObejct` 拿到对应的ScriptObject返回给ScriptX。
+#### `ScriptClass::ScriptClass(ConstructFromCpp<T>, Local<Value>& scriptThis)`
+这个是ScriptClass的另一个构造函数，使用场景是某个绑定类构造时需要很多C++依赖，这样再经过一道ScriptX就导致类型转换很多很麻烦。所以提供这个构造函数，直接用C++new一个实例出来，然后通过 `scriptThiz` 拿到对应的ScriptObject引用返回给ScriptX。
 
 请谨慎使用这个能力，并详细阅读头文件中的相关注释，否则你将面临内存问题导致的crash！
 
 ```c++
-
-class MyImage : public script::ScriptClass {
+class MyImage : public ScriptClass {
  public:
-  MyImage(void* canvas) : script::ScriptClass(script::ScriptClass::ConstructFromCpp<MyImage>{});
-  void drawTo(void* canvas, int x, int y);
+  MyImage(Local<Value>& scriptThis, void* canvas) : 
+    ScriptClass(ScriptClass::ConstructFromCpp<MyImage>{}) {}
+  void drawTo(void* canvas, int x, int y) {}
 };
 
 script::ClassDefine<MyImage> myClassDefine =
     script::defineClass<MyImage>("MyImage")
-     .constructor(nullptr)
-     .function("newImage", []() -> Local<Value> {
-         auto img = new MyImage(Render::getInstance()->canvas());
-         return img.getScriptObject();
-     })
-    .function("newImage2", []() -> MyImge* {
-        // 借助Converter，也可以直接返回指针，ScriptX会转换成和上面等价的代码
-        return MyImage(Render::getInstance()->canvas());
+     // disallow construct from script
+     .constructor(nullptr) 
+     // factory method
+     .function("newImage", []() {
+         Local<Value> thiz;
+         new MyImage(thiz, Render::getInstance()->canvas());
+         return thiz;
      })
      .build();
 ```

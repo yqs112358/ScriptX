@@ -293,7 +293,8 @@ class MyImage : public script::ScriptClass {
   using script::ScriptClass::getScriptObject;
   using script::ScriptClass::ScriptClass;
 
-  MyImage() : script::ScriptClass(script::ScriptClass::ConstructFromCpp<MyImage>{}) {}
+  MyImage(Local<Value>& scriptThis)
+      : script::ScriptClass(script::ScriptClass::ConstructFromCpp<MyImage>{}, scriptThis) {}
 
   int drawTo(void* canvas, int x, int y) const { return x + y; }
 };
@@ -324,7 +325,11 @@ TEST_F(NativeTest, ScriptClassConverter) {
         [](const MyImage& image, int x, int y) -> int { return image.drawTo(nullptr, x, y); });
 
     // return MyImage*
-    auto factory = Function::newFunction([]() -> MyImage* { return new MyImage(); });
+    auto factory = Function::newFunction([]() {
+      Local<Value> thiz;
+      new MyImage(thiz);
+      return thiz;
+    });
 
     auto myClassValue = factory.call();
     auto myClass = engine->getNativeInstance<MyImage>(myClassValue);
@@ -531,7 +536,7 @@ namespace {
 
 class CppNew : public ScriptClass {
  public:
-  explicit CppNew(std::vector<std::string> words);
+  explicit CppNew(Local<Value>& scriptThis, std::vector<std::string> words);
 
   const std::string& greet() const { return words_; }
 
@@ -543,8 +548,9 @@ class CppNew : public ScriptClass {
 
 Local<Object> create() {
   // pure cpp constructor
-  auto ptr = new CppNew({"hello", "world", "cpp"});
-  return ptr->getScriptObject();
+  Local<Value> thiz;
+  new CppNew(thiz, {"hello", "world", "cpp"});
+  return thiz.asObject();
 }
 
 static auto define = defineClass<CppNew>("CppNewTest")
@@ -557,8 +563,8 @@ static auto define = defineClass<CppNew>("CppNewTest")
                          .function("create", create)
                          .build();
 
-CppNew::CppNew(std::vector<std::string> words)
-    : ScriptClass(ScriptClass::ConstructFromCpp<CppNew>{}), words_() {
+CppNew::CppNew(Local<Value>& scriptThis, std::vector<std::string> words)
+    : ScriptClass(ScriptClass::ConstructFromCpp<CppNew>{}, scriptThis), words_() {
   for (auto& w : words) {
     words_ += w;
     words_ += " ";

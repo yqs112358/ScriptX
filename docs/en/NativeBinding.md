@@ -185,31 +185,30 @@ engines require that no engine-related APIs can be called in finalize, the destr
 
 So when you hold a ScriptClass pointer in C++, you may find that `ScriptClass::getScriptObject` returns null in this time gap.
 
-#### `ScriptClass::ScriptClass(ConstructFromCpp<T>)`
-This is another constructor of ScriptClass. The usage scenario is that a certain binding class requires a lot of C++ dependencies when constructing it. In this way, going through another ScriptX will cause a lot of type conversion and troublesome. So provide this constructor, directly use C++new as an instance, and then get the corresponding ScriptObject through `getScriptObejct` and return it to ScriptX.
+#### `ScriptClass::ScriptClass(ConstructFromCpp<T>, Local<Value>& scriptThis)`
+This is another constructor of ScriptClass. The usage scenario is that a certain binding class requires a lot of C++ dependencies when constructing it. In this way, going through another ScriptX will cause a lot of type conversion and troublesome. So provide this constructor, directly use C++new as an instance, and then get the corresponding ScriptObject reference through `scriptThis` and return it to ScriptX.
 
 Please use this competence with extra CAUTION, read the doc in header file with care, otherwise you may face strange crashes (memory issue).
 
 YOU HAVE BEEN WARNED.
 
 ```c++
-
-class MyImage: public script::ScriptClass {
+class MyImage : public ScriptClass {
  public:
-  MyImage(void* canvas): script::ScriptClass(script::ScriptClass::ConstructFromCpp<MyImage>{});
-  void drawTo(void* canvas, int x, int y);
+  MyImage(Local<Value>& scriptThis, void* canvas) : 
+    ScriptClass(ScriptClass::ConstructFromCpp<MyImage>{}) {}
+  void drawTo(void* canvas, int x, int y) {}
 };
 
 script::ClassDefine<MyImage> myClassDefine =
     script::defineClass<MyImage>("MyImage")
-     .constructor(nullptr)
-     .function("newImage", []() -> Local<Value> {
-         auto img = new MyImage(Render::getInstance()->canvas());
-         return img.getScriptObject();
-     })
-    .function("newImage2", []() -> MyImge* {
-        // With the help of Converter, you can also return the pointer directly, and ScriptX will be converted to the equivalent code above
-        return MyImage(Render::getInstance()->canvas());
+     // disallow construct from script
+     .constructor(nullptr) 
+     // factory method
+     .function("newImage", []() {
+         Local<Value> thiz;
+         new MyImage(thiz, Render::getInstance()->canvas());
+         return thiz;
      })
      .build();
 ```
